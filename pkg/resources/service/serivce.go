@@ -25,7 +25,16 @@ func New(etcd *v1alpha1.Etcd) *corev1.Service {
 			},
 		},
 		Spec:corev1.ServiceSpec{
-			Ports:[]corev1.ServicePort{},
+			Ports:[]corev1.ServicePort{
+				{
+					Port: 2379,
+					Name: "etcd-client",
+				},
+				{
+					Port: 2380,
+					Name: "etcd-server",
+				},
+			},
 			ClusterIP:corev1.ClusterIPNone,
 			Selector: map[string]string{
 				"app.example.com/v1alpha1":etcd.Name,
