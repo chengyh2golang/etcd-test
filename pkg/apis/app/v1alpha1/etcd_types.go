@@ -2,10 +2,18 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+
+type InitClusterType string
+const (
+	StaticInitClusterType InitClusterType = "static"
+	DNSInitClusterType InitClusterType = "dns-discovery"
+	ETCDInitClusterType InitClusterType = "etcd-discovery"
+)
 
 // EtcdSpec defines the desired state of Etcd
 // +k8s:openapi-gen=true
@@ -13,6 +21,11 @@ type EtcdSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	Replicas *int32 `json:"replicas"`
+	Image string `json:"image"`
+	Cluster bool `json:"cluster"`
+	Insecure bool `json:"insecure"`
+	ClusterType InitClusterType `json:"clusterType"`
 }
 
 // EtcdStatus defines the observed state of Etcd
@@ -21,6 +34,7 @@ type EtcdStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
+	appsv1.StatefulSetStatus `json:",inline"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
