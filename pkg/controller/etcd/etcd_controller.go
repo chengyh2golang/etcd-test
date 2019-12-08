@@ -175,7 +175,7 @@ func toString(etcd *appv1alpha1.Etcd) string {
 
 func toSpec(data string) appv1alpha1.EtcdSpec {
 	etcdSpec := appv1alpha1.EtcdSpec{}
-	_ := json.Unmarshal([]byte(data), &etcdSpec)
+	_ = json.Unmarshal([]byte(data), &etcdSpec)
 	return etcdSpec
 }
 
