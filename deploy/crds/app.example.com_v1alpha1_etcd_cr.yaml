@@ -1,0 +1,7 @@
+apiVersion: app.example.com/v1alpha1
+kind: Etcd
+metadata:
+  name: example-etcd
+spec:
+  # Add fields here
+  size: 3
