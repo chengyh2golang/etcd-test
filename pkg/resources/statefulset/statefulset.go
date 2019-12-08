@@ -53,7 +53,7 @@ func New(etcd *v1alpha1.Etcd) *appsv1.StatefulSet {
 							},
 							Env:[]corev1.EnvVar{
 								//通过Sprintf把int32转换成了string
-								{Name:"INITIAL_CLUSTER_SIZE",Value:fmt.Sprintf("%v",etcd.Spec.Replicas)},
+								{Name:"INITIAL_CLUSTER_SIZE",Value:fmt.Sprintf("%v",*etcd.Spec.Replicas)},
 								{Name:"SET_NAME",Value:etcd.Name},
 							},
 							Command:[]string{
