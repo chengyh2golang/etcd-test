@@ -44,6 +44,7 @@ func New(etcd *v1alpha1.Etcd) *appsv1.StatefulSet {
 						{
 							Name:"etcd", //现在是硬编码
 							Image:etcd.Spec.Image,
+							ImagePullPolicy:corev1.PullIfNotPresent,
 							Resources:etcd.Spec.Resources,
 							//etcd里port有多个，一个是peer：2380，一个是client：2379
 							Ports:[]corev1.ContainerPort{
