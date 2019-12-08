@@ -26,6 +26,7 @@ type EtcdSpec struct {
 	Cluster bool `json:"cluster"`
 	Insecure bool `json:"insecure"`
 	ClusterType InitClusterType `json:"clusterType"`
+	Storage int32 `json:"storage"`
 }
 
 // EtcdStatus defines the observed state of Etcd

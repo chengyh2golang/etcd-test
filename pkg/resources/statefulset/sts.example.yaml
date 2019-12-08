@@ -1,0 +1,184 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: "2019-12-05T02:54:50Z"
+  generation: 1
+  labels:
+    app: galera-mariadb-galera-mariadb
+    chart: galera-mariadb-1.1.0
+    heritage: Tiller
+    release: galera-mariadb
+  name: mariadb-mariadb
+  namespace: cce
+  resourceVersion: "57983"
+  selfLink: /apis/apps/v1/namespaces/cce/statefulsets/mariadb-mariadb
+  uid: 9b39fc16-170a-11ea-94b5-000c2999f0e6
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: galera-mariadb-galera-mariadb
+  serviceName: mariadb-mariadb
+  template:
+    metadata:
+      annotations:
+        productID: GaleraMariaDB_101_free_00000
+        productName: GaleraMariaDB
+        productVersion: "10.1"
+      creationTimestamp: null
+      labels:
+        app: galera-mariadb-galera-mariadb
+        chart: galera-mariadb-1.1.0
+        heritage: Tiller
+        release: galera-mariadb
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cop.master
+                    operator: In
+                    values:
+                      - master
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - galera-mariadb
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: mysql-root-password
+                  name: galera-mariadb-galera-mariadb
+          image: 192.168.250.22/cce/galera-mariadb:10.2.14
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            exec:
+              command:
+                - /usr/local/bin/readiness-probe.sh
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            successThreshold: 1
+            timeoutSeconds: 5
+          name: mariadb-mariadb
+          ports:
+            - containerPort: 3306
+              name: mysql
+              protocol: TCP
+            - containerPort: 4444
+              name: sst
+              protocol: TCP
+            - containerPort: 4567
+              name: replication
+              protocol: TCP
+            - containerPort: 4568
+              name: ist
+              protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+                - /usr/local/bin/readiness-probe.sh
+            failureThreshold: 3
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 5
+          resources:
+            limits:
+              cpu: "6"
+              memory: 6Gi
+            requests:
+              cpu: 250m
+              memory: 256Mi
+          securityContext:
+            procMount: Default
+            runAsUser: 999
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/localtime
+              name: localtime
+            - mountPath: /var/lib/mysql
+              name: galera-data-pvc
+      dnsPolicy: ClusterFirst
+      imagePullSecrets:
+        - name: default-secret
+      initContainers:
+        - command:
+            - /bin/sh
+            - -c
+            - chown 999:999 -R /var/lib/mysql
+          image: euleros:2.2.5
+          imagePullPolicy: IfNotPresent
+          name: init
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/lib/mysql
+              name: galera-data-pvc
+      priorityClassName: system-node-critical
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      tolerations:
+        - effect: NoSchedule
+          key: role
+          operator: Equal
+          value: master
+        - effect: NoSchedule
+          key: role
+          operator: Equal
+          value: manage
+      volumes:
+        - hostPath:
+            path: /etc/localtime
+            type: ""
+          name: localtime
+  updateStrategy:
+    type: OnDelete
+  volumeClaimTemplates:
+    - metadata:
+        creationTimestamp: null
+        labels:
+          app: galera-mariadb-galera-mariadb
+          chart: galera-mariadb-1.1.0
+          heritage: Tiller
+          release: galera-mariadb
+        name: galera-data-pvc
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        dataSource: null
+        resources:
+          requests:
+            storage: 8Gi
+        storageClassName: local-storage
+        volumeMode: Filesystem
+      status:
+        phase: Pending
+status:
+  collisionCount: 0
+  currentReplicas: 1
+  currentRevision: mariadb-mariadb-856d6b94dd
+  observedGeneration: 1
+  readyReplicas: 1
+  replicas: 1
+  updateRevision: mariadb-mariadb-856d6b94dd
+  updatedReplicas: 1
