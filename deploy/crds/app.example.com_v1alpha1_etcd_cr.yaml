@@ -4,4 +4,8 @@ metadata:
   name: example-etcd
 spec:
   # Add fields here
-  size: 3
+  replicas: 3
+  image: k8s.gcr.io/etcd:3.2.24
+  cluster: true
+  insecure: true
+  clusterType: static
