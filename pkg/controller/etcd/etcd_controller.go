@@ -10,7 +10,6 @@ import (
 	"etcd-test/pkg/resources/statefulset"
 
 	appv1alpha1 "etcd-test/pkg/apis/app/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
