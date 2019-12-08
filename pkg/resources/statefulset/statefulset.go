@@ -28,7 +28,7 @@ func New(etcd *v1alpha1.Etcd) *appsv1.StatefulSet {
 			Replicas:etcd.Spec.Replicas,
 			Selector:&metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					"app.example.com": etcd.Name,
+					"app.example.com/v1alpha1": etcd.Name,
 				},
 			},
 			Template:corev1.PodTemplateSpec{
