@@ -2,22 +2,27 @@ package etcd
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"reflect"
+
+	"etcd-test/pkg/resources/service"
+	"etcd-test/pkg/resources/statefulset"
 
 	appv1alpha1 "etcd-test/pkg/apis/app/v1alpha1"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"k8s.io/client-go/util/retry"
 )
 
 var log = logf.Log.WithName("controller_etcd")
@@ -54,7 +59,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// TODO(user): Modify this to be the types you create that are owned by the primary resource
 	// Watch for changes to secondary resource Pods and requeue the owner Etcd
-	err = c.Watch(&source.Kind{Type: &corev1.Pod{}}, &handler.EnqueueRequestForOwner{
+	err = c.Watch(&source.Kind{Type: &appsv1.StatefulSet{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &appv1alpha1.Etcd{},
 	})
@@ -88,8 +93,8 @@ func (r *ReconcileEtcd) Reconcile(request reconcile.Request) (reconcile.Result, 
 	reqLogger.Info("Reconciling Etcd")
 
 	// Fetch the Etcd instance
-	instance := &appv1alpha1.Etcd{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	etcd := &appv1alpha1.Etcd{}
+	err := r.client.Get(context.TODO(), request.NamespacedName, etcd)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -101,36 +106,86 @@ func (r *ReconcileEtcd) Reconcile(request reconcile.Request) (reconcile.Result, 
 		return reconcile.Result{}, err
 	}
 
-	// Define a new Pod object
-	pod := newPodForCR(instance)
-
-	// Set Etcd instance as the owner and controller
-	if err := controllerutil.SetControllerReference(instance, pod, r.scheme); err != nil {
-		return reconcile.Result{}, err
+	//判断etcd的DeletionTimestamp是否有值，
+	// 如果有值，说明要被删除了，就直接返回，走k8s的垃圾回收机制
+	if etcd.DeletionTimestamp != nil {
+		return reconcile.Result{}, nil
 	}
 
+	//如果查到了，并且不是被删除，就判断它所关联的资源是否存在
 	// Check if this Pod already exists
-	found := &corev1.Pod{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: pod.Name, Namespace: pod.Namespace}, found)
+	found := &appsv1.StatefulSet{}
+	err = r.client.Get(context.TODO(), types.NamespacedName{Name: etcd.Name, Namespace: etcd.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		reqLogger.Info("Creating a new Pod", "Pod.Namespace", pod.Namespace, "Pod.Name", pod.Name)
-		err = r.client.Create(context.TODO(), pod)
+
+		headlessSvc := service.New(etcd)
+		err = r.client.Create(context.TODO(), headlessSvc)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
 
-		// Pod created successfully - don't requeue
+		sts := statefulset.New(etcd)
+		err = r.client.Create(context.TODO(), sts)
+		if err != nil {
+			return reconcile.Result{}, err
+		}
+
+		//创建完成之后还得去做一次更新
+		//把对应的annotation给更新上，因为后面需要用annotation去做判断是否需要去做更新操作
+		etcd.Annotations = map[string]string{
+			"app.example.com/spec":toString(etcd),
+		}
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.client.Update(context.TODO(), etcd)
+		})
+		if retryErr != nil {
+			fmt.Println(retryErr.Error())
+		}
+
 		return reconcile.Result{}, nil
 	} else if err != nil {
 		return reconcile.Result{}, err
 	}
 
-	// Pod already exists - don't requeue
-	reqLogger.Info("Skip reconcile: Pod already exists", "Pod.Namespace", found.Namespace, "Pod.Name", found.Name)
+	//etcd.Annotations["app.example.com/spec"]这是老的信息
+	//etcd.spec是最新的信息，使用DeepEqual方法比较是否相等
+	if !reflect.DeepEqual(etcd.Spec,toSpec(etcd.Annotations["app.example.com/spec"])) {
+		//如果不相等，就需要去更新，更新就是重建sts和svc
+		//但是通常是不会去更新svc的，所以把service.New注释掉，只需要更新sts
+		//headlessSvc := service.New(etcd)
+		sts := statefulset.New(etcd)
+		found.Spec = sts.Spec
+		//然后就去更新，更新要用retry操作去做
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			return r.client.Update(context.TODO(), found)
+		})
+		if retryErr != nil {
+			return reconcile.Result{}, err //如果retry报错，就返回给下一次处理
+		}
+
+	}
+
+
 	return reconcile.Result{}, nil
 }
 
+func toString(etcd *appv1alpha1.Etcd) string {
+	bytes, _ := json.Marshal(etcd.Spec)
+	return  string(bytes)
+}
+
+func toSpec(data string) appv1alpha1.EtcdSpec {
+	etcdSpec := appv1alpha1.EtcdSpec{}
+	_ := json.Unmarshal([]byte(data), &etcdSpec)
+	return etcdSpec
+}
+
+
+
+
+
 // newPodForCR returns a busybox pod with the same name/namespace as the cr
+/*
 func newPodForCR(cr *appv1alpha1.Etcd) *corev1.Pod {
 	labels := map[string]string{
 		"app": cr.Name,
@@ -151,4 +206,5 @@ func newPodForCR(cr *appv1alpha1.Etcd) *corev1.Pod {
 			},
 		},
 	}
-}
+}*/
+
