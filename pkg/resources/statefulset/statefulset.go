@@ -63,6 +63,9 @@ func New(etcd *v1alpha1.Etcd) *appsv1.StatefulSet {
 								{Name:"INITIAL_CLUSTER_SIZE",Value:fmt.Sprintf("%v",*etcd.Spec.Replicas)},
 								{Name:"SET_NAME",Value:etcd.Name},
 							},
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: "datadir", MountPath: "/var/run/etcd"},
+							},
 							Command:[]string{
 								"/bin/sh",
 								"-ec",

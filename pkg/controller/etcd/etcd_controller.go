@@ -126,6 +126,8 @@ func (r *ReconcileEtcd) Reconcile(request reconcile.Request) (reconcile.Result, 
 		sts := statefulset.New(etcd)
 		err = r.client.Create(context.TODO(), sts)
 		if err != nil {
+			//如果创建sts报错，先把之前创建的headlessSvc删除后再返回错误
+			go r.client.Delete(context.TODO(), headlessSvc)
 			return reconcile.Result{}, err
 		}
 
