@@ -8,7 +8,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	_ "k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func New(etcd *v1alpha1.Etcd) *appsv1.StatefulSet {
@@ -21,6 +21,13 @@ func New(etcd *v1alpha1.Etcd) *appsv1.StatefulSet {
 			Name:      etcd.Name,
 			Namespace: etcd.Namespace,
 			Labels:    map[string]string{"app.example.com": etcd.Name},
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(etcd, schema.GroupVersionKind{
+					Group:   v1alpha1.SchemeGroupVersion.Group,
+					Version: v1alpha1.SchemeGroupVersion.Version,
+					Kind:    "Etcd",
+				}),
+			},
 		},
 		Spec:appsv1.StatefulSetSpec{
 			//这个service是headless的svc
